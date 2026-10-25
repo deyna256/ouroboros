@@ -109,8 +109,9 @@ class _StreamedChat(golden._FakeResponse):
         frames = []
         for choice in body.get("choices") or []:
             message = choice.get("message") or {}
+            reasoning = {"reasoning": message["reasoning"]} if "reasoning" in message else {}
             frames += [("", {"id": body["id"], "object": "chat.completion.chunk", "choices": [
-                {"index": 0, "delta": {"role": "assistant", "content": message.get("content")}}]}),
+                {"index": 0, "delta": {"role": "assistant", "content": message.get("content"), **reasoning}}]}),
                 ("", {"id": body["id"], "object": "chat.completion.chunk", "choices": [
                     {"index": 0, "delta": {}, "finish_reason": choice["finish_reason"]}]})]
         frames.append(("", {"id": body["id"], "object": "chat.completion.chunk", "choices": [],
@@ -282,6 +283,23 @@ def test_openai_compatible_reported_nested_zero_reaches_round_and_usage_rows(
         tmp_path, monkeypatch, "x-ai/grok-4.5", {"OPENROUTER_API_KEY": "or-fixture-key"}, step)
     assert round_counts == usage_counts == expected
     assert "cached_tokens" not in usage or usage["cached_tokens"] == 40  # only a positive count is lifted
+
+
+@pytest.mark.parametrize("usage,message,tokens,text", [
+    ({"prompt_tokens": 50, "completion_tokens": 30, "completion_tokens_details": {"reasoning_tokens": 20}},
+     {"reasoning": "Check the order first."}, 20, "Check the order first."),
+    ({"prompt_tokens": 50, "completion_tokens": 30}, {}, None, None),
+])
+def test_round_row_carries_reasoning_tokens_and_display_text(
+    tmp_path, monkeypatch, offline, usage, message, tokens, text,
+):
+    step = {"kind": "response", "body": {
+        "id": "gen-reasoning", "choices": [{"index": 0, "finish_reason": "stop",
+                                            "message": {"role": "assistant", "content": "ok", **message}}],
+        "usage": usage}}
+    _loop_round(tmp_path, monkeypatch, "x-ai/grok-4.5", {"OPENROUTER_API_KEY": "or-fixture-key"}, step)
+    [row] = [row for row in _rows(tmp_path / "logs" / "events.jsonl") if row["type"] == "llm_round"]
+    assert (row["reasoning_tokens"], row["reasoning_text"]) == (tokens, text)
 
 
 @pytest.mark.parametrize("raw,expected", [

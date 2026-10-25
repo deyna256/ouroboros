@@ -34,7 +34,7 @@ from ouroboros.pricing import emit_llm_usage_event, estimate_cost_optional, infe
 from ouroboros.send_clock import main_send_scope
 from ouroboros.task_pacing import main_loop_wire_options
 from ouroboros.transport_custody import attempt_custody_event_fields, is_pre_dispatch_transport_failure, is_retryable_transport_death, outcome_unknown_on_chain
-from ouroboros._usage_response import OUTPUT_LIMIT_FINISH_REASONS, output_exhaustion_facts, provider_cost_value as _provider_cost_value, response_finish_reason
+from ouroboros._usage_response import OUTPUT_LIMIT_FINISH_REASONS, output_exhaustion_facts, provider_cost_value as _provider_cost_value, reasoning_trace_fields, response_finish_reason
 from ouroboros.usage_accounting import PhysicalAttemptContext, UsageAccountingError, bind_physical_attempt_context, current_usage_scope, last_physical_attempt_capture
 from ouroboros.contracts.record_contract import RECORD_CONTRACT_VERSION
 from ouroboros.event_usage import REPORTED_TOKENS_KEY, event_token_counts
@@ -1549,6 +1549,7 @@ def call_llm_with_retry(
                 **{key: usage[key] for key in ("effort", "effort_resolution", "request_wire", "claudexor") if key in usage},
                 "provider": provider, "source": "loop", "model_category": infer_model_category(display_model),
                 **event_token_counts(usage),  # each counter reported, a reported 0, or null (#1578)
+                **reasoning_trace_fields(usage, msg),
                 "prompt_cache_ttl": prompt_cache_ttl, "cache_hit_rate": cache_hit_rate,
                 "cache_cold_restart": cache_cold_restart, "gap_since_prev_round_sec": gap_since_prev_round_sec,
                 "duration_ms": duration_ms, "cost_usd": cost, **context_fit_event_fields,
@@ -1560,7 +1561,7 @@ def call_llm_with_retry(
                 "type": "llm_round_finished", "task_id": task_id, "task_type": task_type, **call_ids,
                 "task_attempt": task_attempt, "model": display_model,
                 **{key: _round_event[key] for key in (
-                    "record_contract_version", "reasoning_effort", "cost_usd", "prompt_tokens", "completion_tokens", "cached_tokens", "cache_write_tokens",
+                    "record_contract_version", "reasoning_effort", "cost_usd", "prompt_tokens", "completion_tokens", "cached_tokens", "cache_write_tokens", "reasoning_tokens",
                     "prompt_cache_ttl", "effort", "effort_resolution", "request_wire", "claudexor", "duration_ms") if key in _round_event},
                 "response_kind": "tool_calls" if tool_calls else "message",
                 "tool_call_count": len(tool_calls),

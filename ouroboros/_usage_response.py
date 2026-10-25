@@ -78,6 +78,22 @@ def reported_reasoning_tokens(usage: Any) -> Optional[int]:
     return None
 
 
+def reasoning_trace_fields(usage: Any, msg: Any) -> Dict[str, Any]:
+    """One round's reasoning for trace readers: ``reasoning_tokens`` (part of the completion,
+    None when unreported) and ``reasoning_text``, the readable display reasoning only —
+    never sealed payloads — bounded and sanitized like a tool preview; None when absent or
+    when the owner turned reasoning summaries off."""
+    from ouroboros.config import runtime_setting
+    from ouroboros.llm import LLMClient
+    from ouroboros.utils import sanitize_tool_result_for_log, truncate_for_log
+
+    text = ""
+    if str(runtime_setting("OUROBOROS_REASONING_SUMMARY", "auto")).strip().lower() != "off":
+        text = LLMClient.extract_display_reasoning(msg)
+    return {"reasoning_tokens": reported_reasoning_tokens(usage),
+            "reasoning_text": sanitize_tool_result_for_log(truncate_for_log(text, 4000)) if text else None}
+
+
 def output_exhaustion_facts(usage: Any, sent_max_tokens: Any) -> Dict[str, Optional[int]]:
     """What one output-exhausted reply's own records prove, for the host fact the next
     round reads: the allowance its physical receipt shows was sent — none when its usage
