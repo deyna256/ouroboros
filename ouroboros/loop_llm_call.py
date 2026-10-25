@@ -1561,7 +1561,7 @@ def call_llm_with_retry(
                 "type": "llm_round_finished", "task_id": task_id, "task_type": task_type, **call_ids,
                 "task_attempt": task_attempt, "model": display_model,
                 **{key: _round_event[key] for key in (
-                    "record_contract_version", "reasoning_effort", "cost_usd", "prompt_tokens", "completion_tokens", "cached_tokens", "cache_write_tokens", "reasoning_tokens",
+                    "record_contract_version", "reasoning_effort", "cost_usd", "prompt_tokens", "completion_tokens", "cached_tokens", "cache_write_tokens",
                     "prompt_cache_ttl", "effort", "effort_resolution", "request_wire", "claudexor", "duration_ms") if key in _round_event},
                 "response_kind": "tool_calls" if tool_calls else "message",
                 "tool_call_count": len(tool_calls),
