@@ -1197,7 +1197,7 @@ def reconstruct_task_cost(
             from ouroboros.cost_projection import (
                 COST_SCOPE_OWN, build_cost_presentation, honest_accounted_amount,
             )
-            from ouroboros.usage_accounting import usage_breakdown
+            from ouroboros.usage_accounting import task_reasoning_tokens, usage_breakdown
 
             authority_root = pathlib.Path(drive_root) if drive_root is not None else DRIVE_ROOT
             if breakdown is None:
@@ -1218,6 +1218,10 @@ def reconstruct_task_cost(
                 "total_rounds": int(bucket.get("physical_calls") or 0),
                 "prompt_tokens": int(bucket.get("prompt_tokens") or 0),
                 "completion_tokens": int(bucket.get("completion_tokens") or 0),
+                # Parts of prompt_tokens, summed over the calls that reported them; None when none did.
+                "cached_tokens": bucket.get("cached_tokens"),
+                "cache_write_tokens": bucket.get("cache_write_tokens"),
+                "reasoning_tokens": task_reasoning_tokens(authority_root, want),  # part of completion_tokens
                 "cost_final": bool(bucket.get("cost_final")),
                 "reserved_usd": float(bucket.get("reserved_usd") or 0.0),
                 "unresolved_upper_bound_usd": float(
@@ -1238,6 +1242,7 @@ def reconstruct_task_cost(
                 "cost_presentation": None,
                 "accounted_upper_bound_usd": None, "total_rounds": None,
                 "prompt_tokens": None, "completion_tokens": None,
+                "cached_tokens": None, "cache_write_tokens": None, "reasoning_tokens": None,
                 "reserved_usd": None, "unresolved_upper_bound_usd": None,
                 "unknown_unmetered": None, "non_final_rows": None,
                 "ledger_integrity_degraded": True,

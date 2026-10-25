@@ -28,6 +28,7 @@ from ouroboros.pricing import estimate_cost_optional
 from ouroboros._usage_response import (
     _normalized_input_token_usage, _reported_token_count, processing_receipt, observed_processing_mode, usage_from_response,
     _plain, _provider_exception_facts, physical_failure_evidence, provider_failure_payload, provider_cost_value,
+    reported_reasoning_tokens,
 )
 from ouroboros.review_dispatch import invoke_bound_api_review_paid_stamp
 from ouroboros.transport_custody import release_pre_dispatch_attempt
@@ -509,6 +510,16 @@ def usage_breakdown(
                                 degraded=usage_store.integrity_degraded(root))
         result["_ledger_high_water_seq"] = txn.marker()
     return result
+
+
+def task_reasoning_tokens(drive_root: pathlib.Path | str | None, task_id: str) -> Optional[int]:
+    """The reasoning part of one task's own completion tokens, from its settled attempts;
+    None unless every attempt that reported a completion also reported its reasoning."""
+    with usage_store.read(_drive_root(drive_root)) as txn:
+        rows = [row for row in txn.attempts("task_id=? AND state='settled'", (str(task_id),))
+                if row.get("completion_tokens") is not None]
+    counts = [row.get("reasoning_tokens") for row in rows]
+    return None if not counts or any(not isinstance(count, int) for count in counts) else sum(counts)
 
 
 def usage_writer_snapshot(
@@ -1263,6 +1274,7 @@ def _settlement_fields(reservation, usage, cost_usd, cost_final) -> Dict[str, An
         completion_tokens=completion_tokens,
         cached_tokens=cached_tokens,
         cache_write_tokens=cache_write_tokens,
+        reasoning_tokens=reported_reasoning_tokens(normalized),  # kept in the row's extra
         prompt_cache_ttl=str(normalized.get("prompt_cache_ttl") or ""),
         **{key: copy.deepcopy(normalized[key]) for key in ("effort", "effort_resolution", "processing", "speed", "service_tier", "cost_basis", "cost_evidence")
            if key in normalized},

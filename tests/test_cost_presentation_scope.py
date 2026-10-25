@@ -330,3 +330,23 @@ def test_nested_rollup_scope_rule(tmp_path, monkeypatch, rollup, swarm, keeps_ow
     assert result['accounted_upper_bound_usd_with_children'] == rollup
     assert result['cost_presentation'] == (own['cost_presentation'] if keeps_own else None)
     assert result['accounted_upper_bound_usd'] == 0
+
+
+def test_task_cost_fields_carry_the_ledger_cache_and_reasoning_parts(data_root):
+    from supervisor.state import reconstruct_task_cost
+
+    compaction_fixtures._settle(data_root, task_id='root', usage={
+        'prompt_tokens': 100, 'completion_tokens': 5, 'cached_tokens': 60, 'cache_write_tokens': 20,
+        'completion_tokens_details': {'reasoning_tokens': 3}})
+    compaction_fixtures._settle(data_root, task_id='root', usage={
+        'prompt_tokens': 50, 'completion_tokens': 5, 'cached_tokens': 40, 'cache_write_tokens': 0,
+        'reasoning_tokens': 0})
+    compaction_fixtures._settle(data_root, task_id='quiet', usage={'prompt_tokens': 10, 'completion_tokens': 1})
+    compaction_fixtures._settle(data_root, task_id='quiet', usage={
+        'prompt_tokens': 10, 'completion_tokens': 1, 'reasoning_tokens': 1})
+    root = reconstruct_task_cost('root', fields=True, drive_root=data_root)
+    assert (root['prompt_tokens'], root['cached_tokens'], root['cache_write_tokens'], root['reasoning_tokens']) == (
+        150, 100, 20, 3)
+    # A count no call reported is unknown, and so is a reasoning sum one call left out.
+    quiet = reconstruct_task_cost('quiet', fields=True, drive_root=data_root)
+    assert (quiet['cached_tokens'], quiet['cache_write_tokens'], quiet['reasoning_tokens']) == (None, None, None)
