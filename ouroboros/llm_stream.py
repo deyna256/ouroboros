@@ -211,7 +211,10 @@ def _merge_list_item(key: str, current: list, item: Any, note: Callable[[str], N
     """List identity is a property of the wire field: ``reasoning_details`` records are
     reassembled by type transition and closed by their signature (the ``index`` they
     carry is no record key on every route); every other list keys on ``index``, and an
-    index-less tool-call fragment continues the last call."""
+    index-less tool-call fragment continues the last call. A fragment opening a call (a new
+    ``id`` with its own name) at an index already taken is a new call: some OpenAI-compatible
+    gateways number every parallel call 0, and merging them would join two calls' names and
+    arguments. A new ``id`` without a name stays a forgiven conflict of the same call."""
     if not isinstance(item, dict):
         current.append(copy.deepcopy(item))
         return
@@ -227,7 +230,12 @@ def _merge_list_item(key: str, current: list, item: Any, note: Callable[[str], N
             note(f"{key}: index {index!r} is not a non-negative integer; treated as absent")
             index = None
         if index is not None:
-            match = next((row for row in current if isinstance(row, dict) and row.get("index") == index), None)
+            match = next((row for row in reversed(current) if isinstance(row, dict) and row.get("index") == index), None)
+            body = item.get("function") or item.get("custom")
+            if (key == "tool_calls" and match and match.get("id") and item.get("id") not in (None, match["id"])
+                    and isinstance(body, dict) and body.get("name")):
+                note(f"{key}: index {index} reused by call id {item['id']!r}; appended as a new call")
+                match = None
             if match is None:
                 match = {"index": index}
                 current.append(match)

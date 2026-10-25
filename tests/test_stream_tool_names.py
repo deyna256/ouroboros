@@ -239,3 +239,23 @@ def test_repeated_name_survives_physical_driver_normalization_and_private_receip
     assert base64.b64decode(evidence["wire_base64"]) == wire
     assert evidence["anomalies"] == receipt["anomalies"]
     assert evidence["partial_assembly"]["choices"][0]["message"]["tool_calls"] == message["tool_calls"]
+
+
+def test_parallel_calls_a_gateway_numbers_alike_stay_apart():
+    # Seen on an OpenAI-compatible gateway: every parallel call at index 0, told apart only by
+    # its id; the argument fragments that follow carry the index alone.
+    def fragment(**call):
+        return {"tool_calls": [{"index": 0, **call}]}
+
+    accumulator = assemble(
+        fragment(id="call_a", type="function", function={"name": "read_file", "arguments": ""}),
+        fragment(function={"arguments": '{"path":"a.txt"}'}),
+        fragment(id="call_b", type="function", function={"name": "run_command", "arguments": ""}),
+        fragment(function={"arguments": '{"cmd":"ls"}'}),
+    )
+    calls = accumulator.result()["choices"][0]["message"]["tool_calls"]
+    assert [(call["id"], call["function"]) for call in calls] == [
+        ("call_a", {"name": "read_file", "arguments": '{"path":"a.txt"}'}),
+        ("call_b", {"name": "run_command", "arguments": '{"cmd":"ls"}'}),
+    ]
+    assert any("reused by call id 'call_b'" in note for note in accumulator.anomaly_facts()["first"])
