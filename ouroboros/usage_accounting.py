@@ -512,19 +512,26 @@ def usage_breakdown(
     return result
 
 
-def task_reasoning_tokens(drive_root: pathlib.Path | str | None, task_id: str) -> Optional[int]:
-    """The reasoning part of one task's own completion tokens, from its settled attempts;
-    None unless every attempt that reported a completion also reported its reasoning."""
+TOKEN_PARTS = ("cached_tokens", "cache_write_tokens", "reasoning_tokens")
+
+
+def task_token_parts(drive_root: pathlib.Path | str | None, task_id: str) -> Dict[str, Optional[int]]:
+    """The parts of one task's own tokens, from its settled attempts: cached and cache-write
+    input, reasoning output. A part is None unless every attempt that reported its input and
+    output reported that part too: a sum some calls left out would read as exact."""
     with usage_store.read(_drive_root(drive_root)) as txn:
-        return reasoning_in(txn, task_id)
+        return token_parts_in(txn, task_id)
 
 
-def reasoning_in(txn: Any, task_id: str) -> Optional[int]:
-    """``task_reasoning_tokens`` inside a read the caller already holds."""
+def token_parts_in(txn: Any, task_id: str) -> Dict[str, Optional[int]]:
+    """``task_token_parts`` inside a read the caller already holds."""
     rows = [row for row in txn.attempts("task_id=? AND state='settled'", (str(task_id),))
-            if row.get("completion_tokens") is not None]
-    counts = [row.get("reasoning_tokens") for row in rows]
-    return None if not counts or any(not isinstance(count, int) for count in counts) else sum(counts)
+            if row.get("prompt_tokens") is not None and row.get("completion_tokens") is not None]
+    parts: Dict[str, Optional[int]] = {}
+    for name in TOKEN_PARTS:
+        counts = [row.get(name) for row in rows]
+        parts[name] = None if not counts or any(not isinstance(n, int) for n in counts) else sum(counts)
+    return parts
 
 
 def usage_writer_snapshot(

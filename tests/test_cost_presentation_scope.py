@@ -350,6 +350,11 @@ def test_task_cost_fields_carry_the_ledger_cache_and_reasoning_parts(data_root):
     # A count no call reported is unknown, and so is a reasoning sum one call left out.
     quiet = reconstruct_task_cost('quiet', fields=True, drive_root=data_root)
     assert (quiet['cached_tokens'], quiet['cache_write_tokens'], quiet['reasoning_tokens']) == (None, None, None)
+    # A cache count some calls left out is unknown too, not the sum of the others.
+    compaction_fixtures._settle(data_root, task_id='mixed', usage={
+        'prompt_tokens': 10, 'completion_tokens': 1, 'cached_tokens': 4})
+    compaction_fixtures._settle(data_root, task_id='mixed', usage={'prompt_tokens': 10, 'completion_tokens': 1})
+    assert reconstruct_task_cost('mixed', fields=True, drive_root=data_root)['cached_tokens'] is None
 
 
 def test_a_prefetched_breakdown_needs_no_read_of_its_own(data_root, monkeypatch):
@@ -362,5 +367,5 @@ def test_a_prefetched_breakdown_needs_no_read_of_its_own(data_root, monkeypatch)
 
     monkeypatch.setattr(usage_store, "read", forbidden)
     fields = reconstruct_task_cost('t', fields=True, drive_root=data_root, breakdown={
-        'by_task': {'t': {'prompt_tokens': 7, 'completion_tokens': 2}}, 'reasoning_by_task': {'t': 1}})
+        'by_task': {'t': {'prompt_tokens': 7, 'completion_tokens': 2}}, 'parts_by_task': {'t': {'reasoning_tokens': 1}}})
     assert (fields['prompt_tokens'], fields['reasoning_tokens']) == (7, 1)

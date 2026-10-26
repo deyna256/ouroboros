@@ -1197,7 +1197,7 @@ def reconstruct_task_cost(
             from ouroboros.cost_projection import (
                 COST_SCOPE_OWN, build_cost_presentation, honest_accounted_amount,
             )
-            from ouroboros.usage_accounting import task_reasoning_tokens, usage_breakdown
+            from ouroboros.usage_accounting import task_token_parts, usage_breakdown
 
             authority_root = pathlib.Path(drive_root) if drive_root is not None else DRIVE_ROOT
             if breakdown is None:
@@ -1218,15 +1218,14 @@ def reconstruct_task_cost(
                 "total_rounds": int(bucket.get("physical_calls") or 0),
                 "prompt_tokens": int(bucket.get("prompt_tokens") or 0),
                 "completion_tokens": int(bucket.get("completion_tokens") or 0),
-                # Parts of prompt_tokens, summed over the calls that reported them; None when none did.
-                "cached_tokens": bucket.get("cached_tokens"),
-                "cache_write_tokens": bucket.get("cache_write_tokens"),
-                # Part of completion_tokens. A prefetched breakdown carries it: a read of its own
-                # here would wait on the import that prefetched it.
-                "reasoning_tokens": (
-                    task_reasoning_tokens(authority_root, want)
+                # Parts of prompt_tokens (cached, cache-write) and of completion_tokens (reasoning),
+                # None unless every call reported them. A prefetched breakdown carries them: a
+                # read of its own here would wait on the import that prefetched it.
+                **(
+                    task_token_parts(authority_root, want)
                     if breakdown is None
-                    else breakdown.get("reasoning_by_task", {}).get(want)
+                    else {name: breakdown.get("parts_by_task", {}).get(want, {}).get(name)
+                          for name in ("cached_tokens", "cache_write_tokens", "reasoning_tokens")}
                 ),
                 "cost_final": bool(bucket.get("cost_final")),
                 "reserved_usd": float(bucket.get("reserved_usd") or 0.0),
