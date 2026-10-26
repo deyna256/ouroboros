@@ -1221,7 +1221,13 @@ def reconstruct_task_cost(
                 # Parts of prompt_tokens, summed over the calls that reported them; None when none did.
                 "cached_tokens": bucket.get("cached_tokens"),
                 "cache_write_tokens": bucket.get("cache_write_tokens"),
-                "reasoning_tokens": task_reasoning_tokens(authority_root, want),  # part of completion_tokens
+                # Part of completion_tokens. A prefetched breakdown carries it: a read of its own
+                # here would wait on the import that prefetched it.
+                "reasoning_tokens": (
+                    task_reasoning_tokens(authority_root, want)
+                    if breakdown is None
+                    else breakdown.get("reasoning_by_task", {}).get(want)
+                ),
                 "cost_final": bool(bucket.get("cost_final")),
                 "reserved_usd": float(bucket.get("reserved_usd") or 0.0),
                 "unresolved_upper_bound_usd": float(

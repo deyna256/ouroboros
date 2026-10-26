@@ -252,6 +252,7 @@ def _terminal_cost_probe(
     from ouroboros.task_status import SETTLED_STATUSES
     from ouroboros import usage_store
     from ouroboros._usage_rows import _with_integrity
+    from ouroboros.usage_accounting import reasoning_in
 
     if current.get("status") not in SETTLED_STATUSES:
         return "ineligible", {}, None
@@ -265,6 +266,7 @@ def _terminal_cost_probe(
     with usage_store.read(authority) as txn:
         breakdown = {"integrity_degraded": degraded,
                      "by_task": {task_id: _with_integrity(txn.bucket("task", task_id).render_breakdown(), degraded)},
+                     "reasoning_by_task": {task_id: reasoning_in(txn, task_id)},
                      "by_root": {scopes[1]: _with_integrity(txn.bucket("root", scopes[1]).render_breakdown(), degraded)}
                      if scopes[0] else {}}
     fields = _authoritative_terminal_cost(task_id, current, current, {}, authority,

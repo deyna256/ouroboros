@@ -350,3 +350,17 @@ def test_task_cost_fields_carry_the_ledger_cache_and_reasoning_parts(data_root):
     # A count no call reported is unknown, and so is a reasoning sum one call left out.
     quiet = reconstruct_task_cost('quiet', fields=True, drive_root=data_root)
     assert (quiet['cached_tokens'], quiet['cache_write_tokens'], quiet['reasoning_tokens']) == (None, None, None)
+
+
+def test_a_prefetched_breakdown_needs_no_read_of_its_own(data_root, monkeypatch):
+    """The legacy import prefetches the breakdown under its lock; a second read would wait on it."""
+    from ouroboros import usage_store
+    from supervisor.state import reconstruct_task_cost
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("a second read of the store")
+
+    monkeypatch.setattr(usage_store, "read", forbidden)
+    fields = reconstruct_task_cost('t', fields=True, drive_root=data_root, breakdown={
+        'by_task': {'t': {'prompt_tokens': 7, 'completion_tokens': 2}}, 'reasoning_by_task': {'t': 1}})
+    assert (fields['prompt_tokens'], fields['reasoning_tokens']) == (7, 1)

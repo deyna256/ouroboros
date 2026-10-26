@@ -516,8 +516,13 @@ def task_reasoning_tokens(drive_root: pathlib.Path | str | None, task_id: str) -
     """The reasoning part of one task's own completion tokens, from its settled attempts;
     None unless every attempt that reported a completion also reported its reasoning."""
     with usage_store.read(_drive_root(drive_root)) as txn:
-        rows = [row for row in txn.attempts("task_id=? AND state='settled'", (str(task_id),))
-                if row.get("completion_tokens") is not None]
+        return reasoning_in(txn, task_id)
+
+
+def reasoning_in(txn: Any, task_id: str) -> Optional[int]:
+    """``task_reasoning_tokens`` inside a read the caller already holds."""
+    rows = [row for row in txn.attempts("task_id=? AND state='settled'", (str(task_id),))
+            if row.get("completion_tokens") is not None]
     counts = [row.get("reasoning_tokens") for row in rows]
     return None if not counts or any(not isinstance(count, int) for count in counts) else sum(counts)
 
