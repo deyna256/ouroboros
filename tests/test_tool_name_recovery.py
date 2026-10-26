@@ -439,6 +439,36 @@ def test_builtin_miss_lists_no_hidden_name_and_points_a_readonly_child_to_discov
     assert safety == [] and transport.call_calls == []
 
 
+def test_an_extension_tool_called_by_its_short_name_is_named_in_full(world, monkeypatch):
+    from ouroboros import extension_loader
+
+    registry, transport, safety = world
+    called = []
+    monkeypatch.setattr(extension_loader, "is_extension_live", lambda *_a, **_k: True)
+    full = {}
+    for skill in ("house-vault", "bank"):  # a skill's text names its tool as it registered it
+        full[skill] = extension_loader.extension_surface_name(skill, "vault_code")
+        monkeypatch.setitem(extension_loader._tools, full[skill], {
+            "name": full[skill], "handler": lambda ctx: called.append(1) or "code",
+            "description": "The vault code", "schema": {"type": "object", "properties": {}},
+            "timeout_sec": 5, "skill": skill,
+        })
+    _bind_loop(registry)
+
+    miss = registry.execute_result("vault_code", {})
+
+    assert (miss.status, miss.code) == ("error", "UNKNOWN_TOOL")
+    assert miss.text.splitlines()[-1] == (
+        f"'vault_code' is the short name of the extension tools {full['house-vault']}, "
+        f"{full['bank']} (not called); call one by its full name.")
+    monkeypatch.delitem(extension_loader._tools, full["bank"])
+    assert registry.execute_result("vault_code", {}).text.splitlines()[-1] == (
+        f"'vault_code' is the short name of the extension tool {full['house-vault']} "
+        "(not called); call it by that name.")
+    assert "vault_code" not in registry.execute_result("vault", {}).text.splitlines()[-1]
+    assert called == [] and safety == [] and transport.call_calls == []
+
+
 def test_loop_executor_records_the_miss_as_unknown_tool_and_the_exact_call_as_ok(world, tmp_path):
     from ouroboros.loop_tool_execution import _execute_single_tool
 

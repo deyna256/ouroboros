@@ -32,7 +32,7 @@ from ouroboros.runtime_mode_policy import (
     protected_paths_in,
     protected_write_block_message,
 )
-from ouroboros.tool_policy import name_miss_guidance, tool_namespace
+from ouroboros.tool_policy import BUILTIN_NAMESPACE, extension_short_name_guidance, name_miss_guidance, tool_namespace
 from ouroboros.tool_capabilities import (
     ACTING_SUBAGENT_MODE,
     acting_tool_names_for_context,
@@ -956,6 +956,8 @@ class ToolRegistry:
             identity = naming_rule_matches(requested, rows)
         guidance = name_miss_guidance(requested or name, namespace, rows, identity=identity,
                                       discovery="list_available_tools" in self.available_tools())
+        if namespace == BUILTIN_NAMESPACE and reason.code == "UNKNOWN_TOOL":
+            guidance += extension_short_name_guidance(name, self.callable_rows() or [])
         return _replace_tool_result(reason, text="\n".join([reason.text, *guidance]))
 
     @staticmethod

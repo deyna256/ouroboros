@@ -287,6 +287,21 @@ def name_miss_guidance(
     return lines
 
 
+def extension_short_name_guidance(requested: str, rows: Sequence[Mapping[str, Any]]) -> List[str]:
+    """The callable extension tools ``requested`` is the short name of: a skill's text names its
+    tool as the plugin registered it, the catalog only by its namespaced name. Nothing is called."""
+    from ouroboros.extension_surface_names import parse_extension_surface_name
+
+    names = sorted(str(row["name"]) for row in rows
+                   if (parsed := parse_extension_surface_name(str(row["name"]))) and parsed[1] == requested)
+    if not names:
+        return []
+    if len(names) == 1:
+        return [f"{requested!r} is the short name of the extension tool {names[0]} (not called); call it by that name."]
+    return [f"{requested!r} is the short name of the extension tools {', '.join(names)} (not called); "
+            "call one by its full name."]
+
+
 CAPABILITY_OMISSION_HEADER = "[CAPABILITY_OMISSION_MANIFEST]"
 
 
